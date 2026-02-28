@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cheese Thief AI Moderator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>Cheese Thief 芝士大盜</h1>
+        </header>
+        <main id="game-container">
+            <!-- Setup Screen -->
+            <div id="setup-screen" class="screen fade-in">
+                <div class="setup-controls">
+                    <div class="control-group">
+                        <label for="language-select">Language / 語言</label>
+                        <select id="language-select">
+                            <option value="zh-HK">廣東話 (Cantonese)</option>
+                            <option value="en-US">English</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="player-count">Players / 人數</label>
+                        <select id="player-count">
+                            <option value="4">4 Players (2 Dice)</option>
+                            <option value="5">5 Players</option>
+                            <option value="6">6 Players</option>
+                            <option value="7">7 Players</option>
+                            <option value="8">8 Players</option>
+                        </select>
+                    </div>
+                    <button id="start-btn" class="btn primary-btn">Start Game / 開始遊戲</button>
+                </div>
+                <div class="rules-summary">
+                    <h3>How to Play</h3>
+                    <p>4 Players: 2 Dice each. Thief wakes at both times.</p>
+                    <p>5-8 Players: 1 Die each. Thief chooses accomplice.</p>
+                </div>
+            </div>
+
+            <!-- Role Assignment Screen (Hidden by default) -->
+            <div id="role-assignment-screen" class="screen hidden">
+                <h2 id="role-phase-title">Identity Check / 身份確認</h2>
+                <div id="role-instruction" class="instruction-text">
+                    Pass device to Player 1
+                </div>
+                <div id="role-reveal-area" class="hidden">
+                    <div class="role-card">
+                        <div class="role-icon">?</div>
+                        <h3 id="player-role-text">Sleepyhead</h3>
+                    </div>
+                    <p id="dice-roll-hint" class="dice-hint hidden"></p>
+                    <div class="dice-display">
+                        <div class="die">?</div>
+                    </div>
+                </div>
+                <button id="role-action-btn" class="btn primary-btn">Reveal / 顯示</button>
+            </div>
+
+            <!-- Night Screen (Hidden by default) -->
+            <div id="night-screen" class="screen hidden">
+                <div class="phase-indicator" id="night-phase-indicator">🌙 Night Phase</div>
+                
+                <div id="game-board">
+                    <div id="cheese-token" class="token cheese">🧀</div>
+                    <div id="players-container">
+                        <!-- Player tokens will be generated here -->
+                    </div>
+                </div>
+
+                <div class="instruction-container">
+                    <p id="instruction-text">Waiting to start...</p>
+                    <p id="peek-hint" class="peek-hint hidden"></p>
+                    <div id="timer-display"></div>
+                </div>
+            </div>
+
+            <!-- Day Screen (Hidden by default) -->
+            <div id="day-screen" class="hidden">
+                <div id="day-phase-indicator">☀️ Day Phase</div>
+                <div id="discussion-timer">00:00</div>
+                <p>Discuss and find the Cheese Thief!</p>
+                <button id="vote-btn">Ready to Vote</button>
+            </div>
+
+            <!-- End Screen (Hidden by default) -->
+            <div id="end-screen" class="hidden">
+                <h2>🗳️ Voting Time!</h2>
+                <div id="voting-instruction">3... 2... 1... Point!</div>
+                <button id="restart-btn">Play Again</button>
+            </div>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
