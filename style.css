@@ -263,6 +263,34 @@ select {
     animation: diceReveal 0.4s ease-out;
 }
 
+/* 4P Sleepyhead: dice are clickable for choosing */
+.die-choosable {
+    cursor: pointer;
+    border-color: #4fc3f7;
+    box-shadow: 0 0 8px rgba(79, 195, 247, 0.5);
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+.die-choosable:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 14px rgba(79, 195, 247, 0.8);
+}
+.die-choosable:active {
+    transform: scale(0.95);
+}
+
+/* Chosen die: bright highlight */
+.die-chosen {
+    background: #c8e6c9;
+    border-color: #4caf50;
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.6);
+}
+
+/* Unselected die: dimmed */
+.die-dimmed {
+    opacity: 0.35;
+    border-color: #ccc;
+}
+
 @keyframes pulse {
     0%, 100% { transform: scale(1); opacity: 0.7; }
     50% { transform: scale(1.05); opacity: 1; }

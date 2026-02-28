@@ -7,7 +7,9 @@ const {
     canPeekAtHour,
     canStealAtHour,
     getRoleName,
-    getRoleIcon
+    getRoleIcon,
+    needsWakeUpChoice,
+    handleDiceChoice
 } = require('../script.js');
 
 // ─── Night Sequence Tests ────────────────────────────────────────
@@ -115,11 +117,12 @@ describe('Role Assignment', () => {
         expect(roles.filter(r => r === 'sleepyhead')).toHaveLength(6);
     });
 
-    test('players start with empty dice (not yet rolled)', () => {
+    test('players start with empty dice and null wakeUpChoice', () => {
         assignRoles(5);
         gameState.players.forEach(p => {
             expect(p.dice).toEqual([]);
             expect(p.diceRolled).toBe(false);
+            expect(p.wakeUpChoice).toBeNull();
         });
     });
 });
@@ -270,14 +273,47 @@ describe('getAwakePlayersAtHour', () => {
         expect(awakeAt3.map(p => p.id)).toEqual([2, 3]);
     });
 
-    test('4P player with 2 dice appears at both hours', () => {
+    test('4P player with 2 dice: fallback to both hours when no choice made', () => {
         gameState.settings.playerCount = 4;
         assignRoles(4);
         gameState.players[0].dice = [2, 5];
+        // wakeUpChoice is null (no choice yet) → fallback uses dice.includes()
+        expect(getAwakePlayersAtHour(2).map(p => p.id)).toContain(1);
+        expect(getAwakePlayersAtHour(5).map(p => p.id)).toContain(1);
+        expect(getAwakePlayersAtHour(3).map(p => p.id)).not.toContain(1);
+    });
+
+    test('4P Sleepyhead with wakeUpChoice: only appears at chosen hour', () => {
+        gameState.settings.playerCount = 4;
+        assignRoles(4);
+        gameState.players[0].role = 'sleepyhead';
+        gameState.players[0].dice = [2, 5];
+        gameState.players[0].wakeUpChoice = 2; // chose to wake at 2
+
+        expect(getAwakePlayersAtHour(2).map(p => p.id)).toContain(1);
+        expect(getAwakePlayersAtHour(5).map(p => p.id)).not.toContain(1);
+    });
+
+    test('4P Thief with array wakeUpChoice: appears at both hours', () => {
+        gameState.settings.playerCount = 4;
+        assignRoles(4);
+        gameState.players[0].role = 'thief';
+        gameState.players[0].dice = [2, 5];
+        gameState.players[0].wakeUpChoice = [2, 5]; // Thief wakes at both
 
         expect(getAwakePlayersAtHour(2).map(p => p.id)).toContain(1);
         expect(getAwakePlayersAtHour(5).map(p => p.id)).toContain(1);
         expect(getAwakePlayersAtHour(3).map(p => p.id)).not.toContain(1);
+    });
+
+    test('5-8P player with single wakeUpChoice: appears only at that hour', () => {
+        gameState.settings.playerCount = 5;
+        assignRoles(5);
+        gameState.players[0].dice = [3];
+        gameState.players[0].wakeUpChoice = 3;
+
+        expect(getAwakePlayersAtHour(3).map(p => p.id)).toContain(1);
+        expect(getAwakePlayersAtHour(1).map(p => p.id)).not.toContain(1);
     });
 });
 
@@ -298,6 +334,58 @@ describe('Helpers', () => {
         expect(getRoleIcon('thief')).toBe('🧀');
         expect(getRoleIcon('sleepyhead')).toBe('😴');
         expect(getRoleIcon('backstabber')).toBe('🐀');
+    });
+});
+
+// ─── Dice Choice Tests (4P) ──────────────────────────────────────
+
+describe('Dice Choice (4P Sleepyhead)', () => {
+    test('needsWakeUpChoice: true for 4P sleepyheads', () => {
+        gameState.settings.playerCount = 4;
+        expect(needsWakeUpChoice({ role: 'sleepyhead' })).toBe(true);
+    });
+
+    test('needsWakeUpChoice: true for 4P backstabber', () => {
+        gameState.settings.playerCount = 4;
+        expect(needsWakeUpChoice({ role: 'backstabber' })).toBe(true);
+    });
+
+    test('needsWakeUpChoice: false for 4P thief', () => {
+        gameState.settings.playerCount = 4;
+        expect(needsWakeUpChoice({ role: 'thief' })).toBe(false);
+    });
+
+    test('needsWakeUpChoice: false for 5+ players', () => {
+        gameState.settings.playerCount = 5;
+        expect(needsWakeUpChoice({ role: 'sleepyhead' })).toBe(false);
+        gameState.settings.playerCount = 6;
+        expect(needsWakeUpChoice({ role: 'sleepyhead' })).toBe(false);
+    });
+
+    test('rollDiceForPlayer auto-sets wakeUpChoice for 5-8P', () => {
+        gameState.settings.playerCount = 5;
+        assignRoles(5);
+        rollDiceForPlayer(0);
+        expect(gameState.players[0].wakeUpChoice).toBe(gameState.players[0].dice[0]);
+    });
+
+    test('rollDiceForPlayer auto-sets array wakeUpChoice for 4P Thief', () => {
+        gameState.settings.playerCount = 4;
+        assignRoles(4);
+        const thiefIdx = gameState.players.findIndex(p => p.role === 'thief');
+        rollDiceForPlayer(thiefIdx);
+        const thief = gameState.players[thiefIdx];
+        expect(Array.isArray(thief.wakeUpChoice)).toBe(true);
+        expect(thief.wakeUpChoice).toEqual(thief.dice);
+    });
+
+    test('rollDiceForPlayer leaves wakeUpChoice null for 4P Sleepyhead', () => {
+        gameState.settings.playerCount = 4;
+        assignRoles(4);
+        const shIdx = gameState.players.findIndex(p => p.role === 'sleepyhead');
+        rollDiceForPlayer(shIdx);
+        expect(gameState.players[shIdx].wakeUpChoice).toBeNull();
+        expect(gameState.players[shIdx].diceRolled).toBe(true);
     });
 });
 

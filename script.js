@@ -71,6 +71,10 @@ const translations = {
         tapToRoll: "撳骰仔擲骰！",
         rolling: "擲緊...",
         diceResult: "你嘅點數係",
+        // Dice Choice (4P)
+        chooseDie: "揀一粒骰仔作為你嘅睜眼時間",
+        chosenWakeUp: "你會喺{n}點睜眼",
+        thiefWakeBoth: "你會喺兩個時間都睜眼",
         // Peek
         peekHint: "你可以偷睇一位玩家嘅骰仔",
         noPeek: "有其他人同時醒緊，唔可以偷睇",
@@ -112,6 +116,10 @@ const translations = {
         tapToRoll: "Tap the dice to roll!",
         rolling: "Rolling...",
         diceResult: "Your number is",
+        // Dice Choice (4P)
+        chooseDie: "Tap one die to choose your wake-up time",
+        chosenWakeUp: "You will wake up at {n} o'clock",
+        thiefWakeBoth: "You wake up at BOTH times",
         // Peek
         peekHint: "You may peek at one player's dice",
         noPeek: "Others are awake — no peeking",
@@ -130,12 +138,32 @@ function t(key, params = {}) {
 // ─── Core Functions ──────────────────────────────────────────────
 
 /**
- * Returns players whose dice include the given hour number.
- * For 5-8P (1 die each): deterministic.
- * For 4P (2 dice): returns all who *could* wake (peeking is disabled for 4P anyway).
+ * Returns players who are actually awake at a given hour.
+ * For 5-8P (1 die each): deterministic — wakeUpChoice equals their single die.
+ * For 4P Thief: awake at both dice hours.
+ * For 4P Sleepyhead/Backstabber: awake only at their chosen die (wakeUpChoice).
  */
 function getAwakePlayersAtHour(hour) {
-    return gameState.players.filter(p => p.dice.includes(hour));
+    return gameState.players.filter(p => {
+        if (p.wakeUpChoice !== null && p.wakeUpChoice !== undefined) {
+            // Player has made an explicit choice (or auto-set for 5-8P)
+            if (Array.isArray(p.wakeUpChoice)) {
+                // Thief in 4P: wakes at both
+                return p.wakeUpChoice.includes(hour);
+            }
+            return p.wakeUpChoice === hour;
+        }
+        // Fallback: use raw dice (before choices are made)
+        return p.dice.includes(hour);
+    });
+}
+
+/**
+ * Check if a player needs to manually choose their wake-up die.
+ * Only 4P Sleepyheads/Backstabbers with 2 different dice need to choose.
+ */
+function needsWakeUpChoice(player) {
+    return gameState.settings.playerCount === 4 && player.role !== 'thief';
 }
 
 /**
@@ -227,7 +255,8 @@ function assignRoles(playerCount) {
             id: i + 1,
             role: roles[i],
             dice: [],
-            diceRolled: false
+            diceRolled: false,
+            wakeUpChoice: null  // number, array, or null
         });
     }
 }
@@ -251,6 +280,16 @@ function rollDiceForPlayer(playerIndex) {
     }
 
     player.diceRolled = true;
+
+    // Auto-set wakeUpChoice for players who don't need to choose
+    if (gameState.settings.playerCount !== 4) {
+        // 5-8P: single die, auto wake at that number
+        player.wakeUpChoice = player.dice[0];
+    } else if (player.role === 'thief') {
+        // 4P Thief: wakes at both dice
+        player.wakeUpChoice = [...player.dice];
+    }
+    // 4P Sleepyhead/Backstabber: wakeUpChoice stays null until they choose
 }
 
 // ─── Game Phase Functions ────────────────────────────────────────
@@ -267,6 +306,7 @@ function startRoleAssignment() {
 function handleRoleAction() {
     const currentIndex = gameState.roleCheckIndex;
     const playerCount = gameState.settings.playerCount;
+    const player = gameState.players[currentIndex];
 
     if (gameState.roleCheckState === 'waiting') {
         // Player tapped "I am Player X" → show role card with roll prompt
@@ -278,6 +318,10 @@ function handleRoleAction() {
         gameState.roleCheckState = 'rolled';
         renderUI();
     } else if (gameState.roleCheckState === 'rolled') {
+        // Block if 4P Sleepyhead hasn't chosen a die yet
+        if (needsWakeUpChoice(player) && player.wakeUpChoice === null) {
+            return; // Must tap a die first
+        }
         // Player tapped "Hide & Pass" or "Start Game"
         if (currentIndex < playerCount - 1) {
             gameState.roleCheckIndex++;
@@ -287,6 +331,18 @@ function handleRoleAction() {
             startNightPhase();
         }
     }
+}
+
+/**
+ * Handle a 4P Sleepyhead tapping a die to choose their wake-up hour.
+ */
+function handleDiceChoice(diceValue) {
+    const player = gameState.players[gameState.roleCheckIndex];
+    if (!needsWakeUpChoice(player)) return;
+    if (player.wakeUpChoice !== null) return; // already chosen
+
+    player.wakeUpChoice = diceValue;
+    renderUI();
 }
 
 function renderGameBoard() {
@@ -610,7 +666,7 @@ function renderUI() {
             if (actionBtn) actionBtn.textContent = t('tapToRoll');
         }
         else if (gameState.roleCheckState === 'rolled') {
-            // Show role + dice result. Button becomes "Hide & Pass" or "Start Game"
+            // Show role + dice result
             if (instruction) instruction.classList.add('hidden');
             if (revealArea) revealArea.classList.remove('hidden');
 
@@ -618,25 +674,62 @@ function renderUI() {
             const roleIcon = document.querySelector('.role-icon');
             if (roleIcon) roleIcon.textContent = getRoleIcon(player.role);
 
+            const needs4PChoice = needsWakeUpChoice(player);
+            const hasChosen = player.wakeUpChoice !== null;
+
             if (diceDisplay) {
                 diceDisplay.innerHTML = '';
                 player.dice.forEach(d => {
                     const dieEl = document.createElement('div');
-                    dieEl.className = 'die die-rolled';
-                    dieEl.textContent = d;
+
+                    if (needs4PChoice && !hasChosen) {
+                        // 4P Sleepyhead: dice are clickable for choosing
+                        dieEl.className = 'die die-rolled die-choosable';
+                        dieEl.textContent = d;
+                        dieEl.onclick = () => handleDiceChoice(d);
+                    } else if (needs4PChoice && hasChosen) {
+                        // 4P Sleepyhead: show chosen vs dimmed
+                        dieEl.className = d === player.wakeUpChoice
+                            ? 'die die-rolled die-chosen'
+                            : 'die die-rolled die-dimmed';
+                        dieEl.textContent = d;
+                    } else {
+                        // 5-8P or 4P Thief: just show dice
+                        dieEl.className = 'die die-rolled';
+                        dieEl.textContent = d;
+                    }
+
                     diceDisplay.appendChild(dieEl);
                 });
             }
 
+            // Hint text
             if (diceHint) {
-                diceHint.textContent = t('diceResult');
+                if (needs4PChoice && !hasChosen) {
+                    diceHint.textContent = t('chooseDie');
+                } else if (needs4PChoice && hasChosen) {
+                    diceHint.textContent = t('chosenWakeUp', { n: player.wakeUpChoice });
+                } else if (gameState.settings.playerCount === 4 && player.role === 'thief') {
+                    diceHint.textContent = t('thiefWakeBoth');
+                } else {
+                    diceHint.textContent = t('diceResult');
+                }
                 diceHint.classList.remove('hidden');
             }
 
-            if (gameState.roleCheckIndex < gameState.settings.playerCount - 1) {
-                if (actionBtn) actionBtn.textContent = t('hideAndPass');
+            // Button text — blocked if choice not yet made
+            if (needs4PChoice && !hasChosen) {
+                if (actionBtn) {
+                    actionBtn.textContent = t('chooseDie');
+                    actionBtn.disabled = true;
+                }
             } else {
-                if (actionBtn) actionBtn.textContent = t('startGame');
+                if (actionBtn) actionBtn.disabled = false;
+                if (gameState.roleCheckIndex < gameState.settings.playerCount - 1) {
+                    if (actionBtn) actionBtn.textContent = t('hideAndPass');
+                } else {
+                    if (actionBtn) actionBtn.textContent = t('startGame');
+                }
             }
         }
     }
@@ -752,6 +845,8 @@ if (typeof module !== 'undefined' && module.exports) {
         canPeekAtHour,
         canStealAtHour,
         getRoleName,
-        getRoleIcon
+        getRoleIcon,
+        needsWakeUpChoice,
+        handleDiceChoice
     };
 }
