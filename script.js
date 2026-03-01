@@ -168,13 +168,10 @@ function needsWakeUpChoice(player) {
 
 /**
  * Determine if peeking should be enabled at a given hour.
- * - 4 players: peeking is NEVER allowed.
- * - 5-8 players: allowed only if exactly 1 player is awake AND that player is a Sleepyhead.
+ * Allowed only if exactly 1 player is awake AND that player is a Sleepyhead.
+ * For 4P, this relies on wakeUpChoice being set so getAwakePlayersAtHour is accurate.
  */
 function canPeekAtHour(hour) {
-    const playerCount = gameState.settings.playerCount;
-    if (playerCount === 4) return false;
-
     const awake = getAwakePlayersAtHour(hour);
     if (awake.length !== 1) return false;
     return awake[0].role === 'sleepyhead';

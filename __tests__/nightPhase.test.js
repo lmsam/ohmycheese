@@ -182,18 +182,40 @@ describe('Dice Rolling', () => {
 // ─── Peeking Logic Tests ────────────────────────────────────────
 
 describe('Peeking Logic', () => {
-    test('4 players: peeking is NEVER allowed', () => {
+    test('4 players: peeking allowed when exactly 1 Sleepyhead chose that hour', () => {
         gameState.settings.playerCount = 4;
         assignRoles(4);
-        // Manually set dice so someone is alone at hour 3
-        gameState.players[0].dice = [3, 5];
-        gameState.players[1].dice = [1, 2];
-        gameState.players[2].dice = [4, 6];
-        gameState.players[3].dice = [1, 4];
-        gameState.players[0].role = 'sleepyhead';
+        // P1: sleepyhead chose 3, P2: sleepyhead chose 1, P3: sleepyhead chose 4, P4: thief at both
+        gameState.players[0].dice = [3, 5]; gameState.players[0].role = 'sleepyhead'; gameState.players[0].wakeUpChoice = 3;
+        gameState.players[1].dice = [1, 2]; gameState.players[1].role = 'sleepyhead'; gameState.players[1].wakeUpChoice = 1;
+        gameState.players[2].dice = [4, 6]; gameState.players[2].role = 'sleepyhead'; gameState.players[2].wakeUpChoice = 4;
+        gameState.players[3].dice = [1, 4]; gameState.players[3].role = 'thief';   gameState.players[3].wakeUpChoice = [1, 4];
 
-        // Even though only player 0 has 3, 4P peeking is disabled
-        expect(canPeekAtHour(3)).toBe(false);
+        // Hour 3: only P1 (sleepyhead) chose 3 → can peek
+        expect(canPeekAtHour(3)).toBe(true);
+
+        // Hour 1: P2 (sleepyhead) + P4 (thief) → 2 awake, no peek
+        expect(canPeekAtHour(1)).toBe(false);
+
+        // Hour 4: P3 (sleepyhead) + P4 (thief) → 2 awake, no peek
+        expect(canPeekAtHour(4)).toBe(false);
+
+        // Hour 5: nobody chose 5 → no peek
+        expect(canPeekAtHour(5)).toBe(false);
+    });
+
+    test('4 players: no peeking if Thief is the only one awake', () => {
+        gameState.settings.playerCount = 4;
+        assignRoles(4);
+        gameState.players[0].dice = [2, 5]; gameState.players[0].role = 'thief';      gameState.players[0].wakeUpChoice = [2, 5];
+        gameState.players[1].dice = [1, 3]; gameState.players[1].role = 'sleepyhead'; gameState.players[1].wakeUpChoice = 1;
+        gameState.players[2].dice = [4, 6]; gameState.players[2].role = 'sleepyhead'; gameState.players[2].wakeUpChoice = 4;
+        gameState.players[3].dice = [3, 6]; gameState.players[3].role = 'sleepyhead'; gameState.players[3].wakeUpChoice = 3;
+
+        // Hour 2: only Thief → no peek (Thief can't peek)
+        expect(canPeekAtHour(2)).toBe(false);
+        // Hour 5: only Thief → no peek
+        expect(canPeekAtHour(5)).toBe(false);
     });
 
     test('5 players: peek allowed if exactly 1 Sleepyhead is awake', () => {
