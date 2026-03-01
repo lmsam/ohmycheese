@@ -624,11 +624,18 @@ function confirmAccompliceSelection() {
     // Disable selection mode
     gameState.nightState.accompliceSelectionEnabled = false;
     updateAccompliceHint();
-    updateAccompliceConfirmButton();
 
     // Remove selection visual from tokens
     const tokens = document.querySelectorAll('.player-token');
     tokens.forEach(tok => tok.classList.remove('accomplice-selected'));
+    
+    // Hide and remove the confirm button
+    const confirmBtn = document.getElementById('accomplice-confirm-btn');
+    if (confirmBtn) {
+        confirmBtn.style.display = 'none';
+        confirmBtn.remove();
+        console.log('[Accomplice] Confirm button removed');
+    }
 }
 
 
@@ -668,21 +675,22 @@ async function runSequence(sequence) {
         // Update instruction UI
         if (instructionEl) instructionEl.textContent = step.text;
 
-        // Handle accomplice selection phase
-        if (step.type === 'accomplice' && (step.text.includes('點選') || step.text.includes('tap') && step.text.includes('screen'))) {
+        // Handle accomplice selection phase (only for the specific step where Thief selects)
+        if (step.type === 'accomplice' && (step.text.includes('點選') || (step.text.includes('tap') && step.text.includes('screen')))) {
             gameState.nightState.accompliceSelectionEnabled = true;
             gameState.nightState.selectedAccomplices = [];
             console.log('[Accomplice] Selection enabled, playerCount:', gameState.settings.playerCount);
             updateAccompliceHint();
             updateAccompliceConfirmButton();
             
-            // Speak first
+            // Speak the instruction
             await speakText(step.text);
             
             // Wait for user to confirm accomplice selection
             await waitForAccompliceConfirmation();
             
-            // Selection is now confirmed, continue to next step
+            console.log('[Accomplice] Confirmation complete, moving to next step');
+            // Skip the duration timer for this step and continue to next
             continue;
         }
 
@@ -697,7 +705,7 @@ async function runSequence(sequence) {
             updatePeekHint();
             updatePeekableTokens();
             updateCheeseToken();
-        } else if (step.type === 'closeEyes' || step.type === 'intro' || step.type === 'morning') {
+        } else if (step.type === 'closeEyes' || step.type === 'intro' || step.type === 'morning' || step.type === 'accomplice') {
             gameState.nightState.peekingEnabled = false;
             gameState.nightState.cheeseStealable = false;
             updatePeekHint();
