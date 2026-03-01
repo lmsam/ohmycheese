@@ -483,6 +483,8 @@ function renderGameBoard() {
 
         // Token click handler — handles both peeking and accomplice selection
         token.onclick = () => {
+            console.log('[Token] Clicked player:', player.id, 'accompliceSelectionEnabled:', gameState.nightState.accompliceSelectionEnabled);
+            
             // Accomplice selection
             if (gameState.nightState.accompliceSelectionEnabled) {
                 const maxAccomplices = gameState.settings.playerCount >= 7 ? 2 : 1;
@@ -492,10 +494,12 @@ function renderGameBoard() {
                     // Deselect
                     gameState.nightState.selectedAccomplices.splice(selectedIndex, 1);
                     token.classList.remove('accomplice-selected');
+                    console.log('[Accomplice] Deselected player:', player.id);
                 } else if (gameState.nightState.selectedAccomplices.length < maxAccomplices) {
                     // Select
                     gameState.nightState.selectedAccomplices.push(player.id);
                     token.classList.add('accomplice-selected');
+                    console.log('[Accomplice] Selected player:', player.id, 'Total selected:', gameState.nightState.selectedAccomplices);
                 }
                 updateAccompliceConfirmButton();
                 return;
@@ -578,8 +582,20 @@ function updateAccompliceConfirmButton() {
         confirmBtn.id = 'accomplice-confirm-btn';
         confirmBtn.className = 'accomplice-confirm-btn';
         confirmBtn.textContent = t('accompliceConfirm');
-        confirmBtn.onclick = confirmAccompliceSelection;
-        document.querySelector('.night-screen').appendChild(confirmBtn);
+        // Don't set onclick here - it will be set in waitForAccompliceConfirmation
+        const nightScreen = document.getElementById('night-screen');
+        if (nightScreen) {
+            nightScreen.appendChild(confirmBtn);
+            console.log('[Accomplice] Confirm button created and appended to night-screen');
+        } else {
+            console.error('[Accomplice] Night screen not found, cannot create button');
+            // Fallback: try to find any visible screen
+            const visibleScreen = document.querySelector('.screen:not(.hidden)');
+            if (visibleScreen) {
+                visibleScreen.appendChild(confirmBtn);
+                console.log('[Accomplice] Confirm button appended to visible screen as fallback');
+            }
+        }
     }
 
     if (confirmBtn) {
@@ -587,6 +603,7 @@ function updateAccompliceConfirmButton() {
         const isValid = gameState.nightState.selectedAccomplices.length === maxAccomplices;
         confirmBtn.disabled = !isValid;
         confirmBtn.style.display = gameState.nightState.accompliceSelectionEnabled ? 'block' : 'none';
+        console.log('[Accomplice] Button state - enabled:', gameState.nightState.accompliceSelectionEnabled, 'valid:', isValid, 'selected:', gameState.nightState.selectedAccomplices.length);
     }
 }
 
@@ -594,11 +611,13 @@ function updateAccompliceConfirmButton() {
  * Confirm accomplice selection and mark players as accomplices.
  */
 function confirmAccompliceSelection() {
+    console.log('[Accomplice] Confirming selection:', gameState.nightState.selectedAccomplices);
     // Mark selected players as accomplices
     gameState.nightState.selectedAccomplices.forEach(playerId => {
         const player = gameState.players.find(p => p.id === playerId);
         if (player) {
             player.isAccomplice = true;
+            console.log('[Accomplice] Marked player', playerId, 'as accomplice');
         }
     });
 
@@ -610,9 +629,6 @@ function confirmAccompliceSelection() {
     // Remove selection visual from tokens
     const tokens = document.querySelectorAll('.player-token');
     tokens.forEach(tok => tok.classList.remove('accomplice-selected'));
-
-    // Resume the sequence (this will be handled by the sequence runner)
-    // The sequence will automatically proceed to the next step
 }
 
 
@@ -656,6 +672,7 @@ async function runSequence(sequence) {
         if (step.type === 'accomplice' && (step.text.includes('點選') || step.text.includes('tap') && step.text.includes('screen'))) {
             gameState.nightState.accompliceSelectionEnabled = true;
             gameState.nightState.selectedAccomplices = [];
+            console.log('[Accomplice] Selection enabled, playerCount:', gameState.settings.playerCount);
             updateAccompliceHint();
             updateAccompliceConfirmButton();
             
@@ -719,17 +736,18 @@ async function runSequence(sequence) {
  */
 function waitForAccompliceConfirmation() {
     return new Promise((resolve) => {
-        // Store the original onclick
         const confirmBtn = document.getElementById('accomplice-confirm-btn');
         if (!confirmBtn) {
-            // Fallback: if no button, just resolve after a timeout
+            console.warn('[Accomplice] Confirm button not found');
             setTimeout(resolve, 1000);
             return;
         }
 
-        const originalOnclick = confirmBtn.onclick;
+        console.log('[Accomplice] Waiting for confirmation...');
+        // Override onclick to resolve promise when clicked
         confirmBtn.onclick = () => {
-            if (originalOnclick) originalOnclick();
+            console.log('[Accomplice] Confirmation clicked');
+            confirmAccompliceSelection();
             resolve();
         };
     });
