@@ -33,6 +33,35 @@ function stopBGM() {
     // Placeholder: Stop Audio objects here
 }
 
+// ─── localStorage Helpers ────────────────────────────────────────────────────
+
+/**
+ * Save player names to localStorage.
+ */
+function savePlayerNames(names) {
+    try {
+        localStorage.setItem('cheeseThief_playerNames', JSON.stringify(names));
+    } catch (e) {
+        console.warn('localStorage not available:', e);
+    }
+}
+
+/**
+ * Load player names from localStorage for a given player count.
+ */
+function loadPlayerNames(playerCount) {
+    try {
+        const saved = localStorage.getItem('cheeseThief_playerNames');
+        if (saved) {
+            const names = JSON.parse(saved);
+            return names.slice(0, playerCount);
+        }
+    } catch (e) {
+        console.warn('localStorage read failed:', e);
+    }
+    return [];
+}
+
 const translations = {
     'zh-HK': {
         nightStart: "天黑請閉眼",
@@ -78,6 +107,21 @@ const translations = {
         // Peek
         peekHint: "你可以偷睇一位玩家嘅骰仔",
         noPeek: "有其他人同時醒緊，唔可以偷睇",
+        // Voting
+        readyToVote: "準備投票",
+        votingIntro: "投票時間！",
+        voting3: "三",
+        voting2: "二",
+        voting1: "一",
+        votingPoint: "指！",
+        // End Screen
+        gameOver: "遊戲結束",
+        revealTitle: "身份揭曉",
+        playAgain: "再玩一次",
+        playerLabel: "玩家 {n}",
+        // Setup
+        playerNameLabel: "玩家 {n} 名",
+        playerNamePlaceholder: "玩家 {n}",
     },
     'en-US': {
         nightStart: "Everyone close your eyes",
@@ -123,6 +167,21 @@ const translations = {
         // Peek
         peekHint: "You may peek at one player's dice",
         noPeek: "Others are awake — no peeking",
+        // Voting
+        readyToVote: "Ready to Vote",
+        votingIntro: "Voting Time!",
+        voting3: "Three",
+        voting2: "Two",
+        voting1: "One",
+        votingPoint: "Point!",
+        // End Screen
+        gameOver: "Game Over",
+        revealTitle: "Identity Reveal",
+        playAgain: "Play Again",
+        playerLabel: "Player {n}",
+        // Setup
+        playerNameLabel: "Player {n} Name",
+        playerNamePlaceholder: "Player {n}",
     }
 };
 
@@ -168,10 +227,11 @@ function needsWakeUpChoice(player) {
 
 /**
  * Determine if peeking should be enabled at a given hour.
- * Allowed only if exactly 1 player is awake AND that player is a Sleepyhead.
- * For 4P, this relies on wakeUpChoice being set so getAwakePlayersAtHour is accurate.
+ * - 4 players: peeking is DISABLED (too easy).
+ * - 5-8 players: allowed only if exactly 1 player is awake AND that player is a Sleepyhead.
  */
 function canPeekAtHour(hour) {
+    if (gameState.settings.playerCount === 4) return false;
     const awake = getAwakePlayersAtHour(hour);
     if (awake.length !== 1) return false;
     return awake[0].role === 'sleepyhead';
@@ -247,9 +307,11 @@ function assignRoles(playerCount) {
     }
 
     gameState.players = [];
+    const savedNames = loadPlayerNames(playerCount);
     for (let i = 0; i < playerCount; i++) {
         gameState.players.push({
             id: i + 1,
+            name: savedNames[i] || t('playerLabel', { n: i + 1 }),
             role: roles[i],
             dice: [],
             diceRolled: false,
@@ -553,7 +615,8 @@ function startVoting() {
     
     // Voting countdown sequence
     const sequence = [
-        { text: t('votingIntro'), duration: 1 },
+        { text: t('votingIntro'), duration: 2 },
+        { text: t('voting3'), duration: 1 },
         { text: t('voting2'), duration: 1 },
         { text: t('voting1'), duration: 1 },
         { text: t('votingPoint'), duration: 0 }
@@ -601,6 +664,80 @@ function updateGameState(updates) {
     renderUI();
 }
 
+/**
+ * Render player name input fields in setup screen.
+ */
+function renderPlayerNames() {
+    const container = document.getElementById('player-names-container');
+    if (!container) return;
+
+    const playerCount = gameState.settings.playerCount;
+    const savedNames = loadPlayerNames(playerCount);
+
+    container.innerHTML = '';
+    for (let i = 0; i < playerCount; i++) {
+        const inputWrapper = document.createElement('div');
+        inputWrapper.className = 'player-name-input-wrapper';
+
+        const label = document.createElement('label');
+        label.textContent = t('playerNameLabel', { n: i + 1 });
+        label.htmlFor = `player-name-${i}`;
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.id = `player-name-${i}`;
+        input.className = 'player-name-input';
+        input.placeholder = t('playerNamePlaceholder', { n: i + 1 });
+        input.value = savedNames[i] || '';
+        input.addEventListener('input', () => {
+            const allInputs = container.querySelectorAll('.player-name-input');
+            const names = Array.from(allInputs).map(inp => inp.value.trim() || t('playerLabel', { n: parseInt(inp.id.split('-')[2]) + 1 }));
+            savePlayerNames(names);
+        });
+
+        inputWrapper.appendChild(label);
+        inputWrapper.appendChild(input);
+        container.appendChild(inputWrapper);
+    }
+}
+
+/**
+ * Render all players' roles and dice at end screen.
+ */
+function renderRoleReveal() {
+    const container = document.getElementById('role-reveal-container');
+    if (!container) return;
+
+    container.innerHTML = '';
+    gameState.players.forEach(player => {
+        const card = document.createElement('div');
+        card.className = `role-reveal-card ${player.role}`;
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'reveal-player-name';
+        nameEl.textContent = player.name;
+
+        const roleEl = document.createElement('div');
+        roleEl.className = 'reveal-role';
+        roleEl.textContent = `${getRoleIcon(player.role)} ${getRoleName(player.role)}`;
+
+        const diceEl = document.createElement('div');
+        diceEl.className = 'reveal-dice';
+        if (Array.isArray(player.wakeUpChoice)) {
+            diceEl.textContent = `🎲 ${player.wakeUpChoice.join(', ')}`;
+        } else if (player.wakeUpChoice !== null) {
+            diceEl.textContent = `🎲 ${player.wakeUpChoice}`;
+        } else {
+            diceEl.textContent = `🎲 ${player.dice.join(', ')}`;
+        }
+
+        card.appendChild(nameEl);
+        card.appendChild(roleEl);
+        card.appendChild(diceEl);
+        container.appendChild(card);
+    });
+}
+
 function renderUI() {
     const setupScreen = document.getElementById('setup-screen');
     const roleAssignmentScreen = document.getElementById('role-assignment-screen');
@@ -627,6 +764,7 @@ function renderUI() {
     // ── Setup ─────────────────────────
     if (gameState.phase === 'setup') {
         showScreen(setupScreen);
+        renderPlayerNames();
     }
 
     // ── Role Assignment ───────────────
@@ -784,10 +922,11 @@ function renderUI() {
         showScreen(endScreen);
         if (endScreen) {
             const heading = endScreen.querySelector('h2');
-            if (heading) heading.textContent = t('uiVoting');
+            if (heading) heading.textContent = t('gameOver');
             const restartBtn = document.getElementById('restart-btn');
-            if (restartBtn) restartBtn.textContent = t('uiPlayAgain');
+            if (restartBtn) restartBtn.textContent = t('playAgain');
         }
+        renderRoleReveal();
     }
 }
 
@@ -828,6 +967,20 @@ function initGame() {
             gameState.settings.playerCount = count;
             gameState.settings.language = lang;
             startRoleAssignment();
+        });
+    }
+
+    if (playerCountSelect) {
+        playerCountSelect.addEventListener('change', () => {
+            gameState.settings.playerCount = parseInt(playerCountSelect.value);
+            renderPlayerNames();
+        });
+    }
+
+    if (languageSelect) {
+        languageSelect.addEventListener('change', () => {
+            gameState.settings.language = languageSelect.value;
+            renderPlayerNames();
         });
     }
 

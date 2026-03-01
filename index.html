@@ -32,6 +32,9 @@
                             <option value="8">8 Players</option>
                         </select>
                     </div>
+                    <div id="player-names-container" class="control-group">
+                        <!-- Player name inputs will be generated here -->
+                    </div>
                     <button id="start-btn" class="btn primary-btn">Start Game / 開始遊戲</button>
                 </div>
                 <div class="rules-summary">
@@ -83,14 +86,17 @@
                 <div id="day-phase-indicator">☀️ Day Phase</div>
                 <div id="discussion-timer">00:00</div>
                 <p>Discuss and find the Cheese Thief!</p>
-                <button id="vote-btn">Ready to Vote</button>
+                <button id="vote-btn" class="btn primary-btn">Ready to Vote / 準備投票</button>
             </div>
 
             <!-- End Screen (Hidden by default) -->
             <div id="end-screen" class="hidden">
-                <h2>🗳️ Voting Time!</h2>
+                <h2 id="end-title">🗳️ Voting Time!</h2>
                 <div id="voting-instruction">3... 2... 1... Point!</div>
-                <button id="restart-btn">Play Again</button>
+                <div id="role-reveal-container" class="role-reveal-grid">
+                    <!-- Role reveals will be generated here -->
+                </div>
+                <button id="restart-btn" class="btn primary-btn">Play Again / 再玩一次</button>
             </div>
         </main>
     </div>

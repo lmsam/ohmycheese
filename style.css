@@ -326,3 +326,81 @@ select {
     border-color: #9c27b0;
     background: #f3e5f5;
 }
+
+/* Player Name Inputs */
+.player-name-input-wrapper {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 10px;
+}
+
+.player-name-input-wrapper label {
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+    color: #555;
+}
+
+.player-name-input {
+    padding: 8px;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    transition: border-color 0.2s;
+}
+
+.player-name-input:focus {
+    outline: none;
+    border-color: #ffcc00;
+}
+
+/* Role Reveal Grid (End Screen) */
+.role-reveal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+    width: 100%;
+    max-width: 500px;
+}
+
+.role-reveal-card {
+    border: 2px solid #333;
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.role-reveal-card.thief {
+    border-color: #e53935;
+    background: #ffebee;
+}
+
+.role-reveal-card.backstabber {
+    border-color: #9c27b0;
+    background: #f3e5f5;
+}
+
+.role-reveal-card.sleepyhead {
+    border-color: #42a5f5;
+    background: #e3f2fd;
+}
+
+.reveal-player-name {
+    font-weight: bold;
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+.reveal-role {
+    font-size: 0.95rem;
+    margin-bottom: 6px;
+    color: #555;
+}
+
+.reveal-dice {
+    font-size: 1rem;
+    color: #777;
+}
