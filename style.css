@@ -117,6 +117,12 @@ button:hover {
     margin: 2rem 0;
 }
 
+#show-results-btn {
+    margin-top: 2rem;
+    padding: 15px 30px;
+    font-size: 1.3rem;
+}
+
 .control-group {
     margin-bottom: 1rem;
     display: flex;

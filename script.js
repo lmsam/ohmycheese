@@ -76,6 +76,7 @@ const translations = {
         thiefClose: "芝士大盜同共犯請閉眼。",
         morning: "天光啦！所有人請睜眼。",
         votingIntro: "所有人請準備投票，3...",
+        voting3: "3...",
         voting2: "2...",
         voting1: "1...",
         votingPoint: "請指認！",
@@ -86,6 +87,7 @@ const translations = {
         uiVoting: "🗳️ 投票時間！",
         uiPoint: "3... 2... 1... 指！",
         uiReadyVote: "準備投票",
+        uiShowResults: "顯示身份",
         uiPlayAgain: "再玩一次",
         uiWaiting: "等待開始...",
         // Role Assignment
@@ -142,6 +144,7 @@ const translations = {
         thiefClose: "Thief and Accomplice(s) close your eyes.",
         morning: "Morning has broken! Everyone wake up.",
         votingIntro: "Everyone, point your finger in 3...",
+        voting3: "3...",
         voting2: "2...",
         voting1: "1...",
         votingPoint: "Point now!",
@@ -152,6 +155,7 @@ const translations = {
         uiVoting: "🗳️ Voting Time!",
         uiPoint: "3... 2... 1... Point!",
         uiReadyVote: "Ready to Vote",
+        uiShowResults: "Show Results",
         uiPlayAgain: "Play Again",
         uiWaiting: "Waiting to start...",
         // Role Assignment
@@ -249,7 +253,7 @@ function canPeekAtHour(hour) {
     if (gameState.settings.playerCount === 4) return false;
     const awake = getAwakePlayersAtHour(hour);
     if (awake.length !== 1) return false;
-    return awake[0].role === 'sleepyhead';
+    return awake[0].role === 'sleepyhead' || awake[0].role === 'backstabber';
 }
 
 /**
@@ -649,7 +653,7 @@ async function runSequence(sequence) {
         if (instructionEl) instructionEl.textContent = step.text;
 
         // Handle accomplice selection phase
-        if (step.type === 'accomplice' && step.text.includes(gameState.settings.language === 'zh-HK' ? '選擇' : 'choose')) {
+        if (step.type === 'accomplice' && (step.text.includes('點選') || step.text.includes('tap') && step.text.includes('screen'))) {
             gameState.nightState.accompliceSelectionEnabled = true;
             gameState.nightState.selectedAccomplices = [];
             updateAccompliceHint();
@@ -761,8 +765,10 @@ function startDayPhase() {
 
 function startVoting() {
     if (gameState.dayTimerInterval) clearInterval(gameState.dayTimerInterval);
-    updateGameState({ phase: 'ended' });
     stopBGM();
+    
+    // Set to voting phase first
+    updateGameState({ phase: 'voting' });
     
     // Voting countdown sequence
     const sequence = [
@@ -785,6 +791,13 @@ async function runVotingSequence(sequence) {
         if (step.duration > 0) {
             await new Promise(resolve => setTimeout(resolve, step.duration * 1000));
         }
+    }
+    
+    // After voting sequence completes, show "Show Results" button instead of auto-revealing
+    if (instructionEl) instructionEl.textContent = '';
+    const showResultsBtn = document.getElementById('show-results-btn');
+    if (showResultsBtn) {
+        showResultsBtn.style.display = 'block';
     }
 }
 
@@ -1072,13 +1085,36 @@ function renderUI() {
     }
 
     // ── Ended / Voting ────────────────
+    else if (gameState.phase === 'voting') {
+        showScreen(endScreen);
+        if (endScreen) {
+            const heading = endScreen.querySelector('h2');
+            if (heading) heading.textContent = t('uiReadyVote');
+            const roleRevealContainer = document.getElementById('role-reveal-container');
+            if (roleRevealContainer) roleRevealContainer.style.display = 'none';
+            const restartBtn = document.getElementById('restart-btn');
+            if (restartBtn) restartBtn.style.display = 'none';
+            const showResultsBtn = document.getElementById('show-results-btn');
+            if (showResultsBtn) {
+                showResultsBtn.style.display = 'none';
+                showResultsBtn.textContent = t('uiShowResults');
+            }
+        }
+    }
     else if (gameState.phase === 'ended') {
         showScreen(endScreen);
         if (endScreen) {
             const heading = endScreen.querySelector('h2');
             if (heading) heading.textContent = t('gameOver');
+            const roleRevealContainer = document.getElementById('role-reveal-container');
+            if (roleRevealContainer) roleRevealContainer.style.display = 'grid';
             const restartBtn = document.getElementById('restart-btn');
-            if (restartBtn) restartBtn.textContent = t('playAgain');
+            if (restartBtn) {
+                restartBtn.textContent = t('playAgain');
+                restartBtn.style.display = 'block';
+            }
+            const showResultsBtn = document.getElementById('show-results-btn');
+            if (showResultsBtn) showResultsBtn.style.display = 'none';
         }
         renderRoleReveal();
     }
@@ -1146,6 +1182,13 @@ function initGame() {
 
     if (voteBtn) {
         voteBtn.addEventListener('click', startVoting);
+    }
+
+    const showResultsBtn = document.getElementById('show-results-btn');
+    if (showResultsBtn) {
+        showResultsBtn.addEventListener('click', () => {
+            updateGameState({ phase: 'ended' });
+        });
     }
 
     if (restartBtn) {

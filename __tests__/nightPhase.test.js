@@ -40,7 +40,7 @@ describe('Night Phase Sequence', () => {
         const sequence = getNightSequence(6);
         const accompliceSteps = sequence.filter(s => s.type === 'accomplice');
         expect(accompliceSteps.length).toBe(3);
-        expect(accompliceSteps[0].text).toContain('Thief wake up and choose an accomplice');
+        expect(accompliceSteps[0].text).toContain('Thief wake up');
         expect(accompliceSteps[0].text).toContain('ONE');
     });
 
@@ -234,7 +234,7 @@ describe('Peeking Logic', () => {
         expect(canPeekAtHour(3)).toBe(false);
     });
 
-    test('no peeking if Backstabber is the only one awake', () => {
+    test('Backstabber can peek when alone', () => {
         gameState.settings.playerCount = 6;
         assignRoles(6);
         gameState.players[0].dice = [4];
@@ -247,7 +247,7 @@ describe('Peeking Logic', () => {
         gameState.players[4].dice = [5];
         gameState.players[5].dice = [6];
 
-        expect(canPeekAtHour(4)).toBe(false);
+        expect(canPeekAtHour(4)).toBe(true);
     });
 
     test('no players awake at a given hour → no peek', () => {
