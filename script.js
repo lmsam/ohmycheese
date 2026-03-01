@@ -901,7 +901,9 @@ function renderRoleReveal() {
     container.innerHTML = '';
     gameState.players.forEach(player => {
         const card = document.createElement('div');
-        card.className = `role-reveal-card ${player.role}`;
+        // Add accomplice class if player is an accomplice
+        const accompliceClass = player.isAccomplice ? ' accomplice' : '';
+        card.className = `role-reveal-card ${player.role}${accompliceClass}`;
 
         const nameEl = document.createElement('div');
         nameEl.className = 'reveal-player-name';

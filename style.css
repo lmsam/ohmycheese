@@ -404,6 +404,12 @@ select {
     background: #e3f2fd;
 }
 
+/* Accomplice gets red border regardless of role */
+.role-reveal-card.accomplice {
+    border-color: #e53935;
+    border-width: 3px;
+}
+
 .reveal-player-name {
     font-weight: bold;
     font-size: 1.1rem;
