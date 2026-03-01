@@ -57,6 +57,13 @@ describe('Night Phase Sequence', () => {
         expect(accompliceSteps[0].text).toContain('TWO');
     });
 
+    test('should include accomplice selection phase for 9 players (choose TWO)', () => {
+        const sequence = getNightSequence(9);
+        const accompliceSteps = sequence.filter(s => s.type === 'accomplice');
+        expect(accompliceSteps.length).toBe(3);
+        expect(accompliceSteps[0].text).toContain('TWO');
+    });
+
     test('each wakeUp step should have an hour property', () => {
         const sequence = getNightSequence(5);
         const wakeUpSteps = sequence.filter(s => s.type === 'wakeUp');
@@ -115,6 +122,14 @@ describe('Role Assignment', () => {
         expect(roles.filter(r => r === 'thief')).toHaveLength(1);
         expect(roles.filter(r => r === 'backstabber')).toHaveLength(1);
         expect(roles.filter(r => r === 'sleepyhead')).toHaveLength(6);
+    });
+
+    test('9 players: 1 thief + 1 backstabber + 7 sleepyheads', () => {
+        assignRoles(9);
+        const roles = gameState.players.map(p => p.role);
+        expect(roles.filter(r => r === 'thief')).toHaveLength(1);
+        expect(roles.filter(r => r === 'backstabber')).toHaveLength(1);
+        expect(roles.filter(r => r === 'sleepyhead')).toHaveLength(7);
     });
 
     test('players start with empty dice, null wakeUpChoice, and have names', () => {
