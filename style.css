@@ -328,24 +328,35 @@ select {
 }
 
 /* Player Name Inputs */
+#player-names-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    margin: 15px 0;
+    width: 100%;
+    max-width: 500px;
+}
+
 .player-name-input-wrapper {
     display: flex;
     flex-direction: column;
-    margin-bottom: 10px;
 }
 
 .player-name-input-wrapper label {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     margin-bottom: 4px;
     color: #555;
+    font-weight: 500;
 }
 
 .player-name-input {
     padding: 8px;
-    font-size: 1rem;
+    font-size: 0.95rem;
     border: 1px solid #ccc;
     border-radius: 4px;
     transition: border-color 0.2s;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .player-name-input:focus {
