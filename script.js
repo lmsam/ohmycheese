@@ -461,17 +461,11 @@ function updatePeekableTokens() {
 }
 
 /**
- * Update cheese token visual state — glows when stealable.
+ * Update cheese token state (no visual change — silent to avoid revealing the Thief).
  */
 function updateCheeseToken() {
-    const cheese = document.getElementById('cheese-token');
-    if (!cheese) return;
-
-    if (gameState.nightState.cheeseStealable && !gameState.nightState.cheeseTaken) {
-        cheese.classList.add('stealable');
-    } else {
-        cheese.classList.remove('stealable');
-    }
+    // Intentionally no visual change.
+    // The cheese onclick handler checks cheeseStealable at tap time.
 }
 
 /**

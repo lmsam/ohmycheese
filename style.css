@@ -209,15 +209,7 @@ select {
     pointer-events: none;
 }
 
-.cheese.stealable {
-    animation: cheeseGlow 1s ease-in-out infinite;
-    cursor: pointer;
-}
-
-@keyframes cheeseGlow {
-    0%, 100% { box-shadow: 0 0 8px rgba(255,204,0,0.4); }
-    50% { box-shadow: 0 0 20px rgba(255,204,0,0.9), 0 0 40px rgba(255,153,0,0.4); }
-}
+/* Cheese is silently stealable — no visual hint to avoid revealing the Thief */
 
 .player-token {
     width: 50px;
