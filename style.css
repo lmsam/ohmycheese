@@ -415,3 +415,44 @@ select {
     font-size: 1rem;
     color: #777;
 }
+
+/* Accomplice Selection Styles */
+.accomplice-selected {
+    border: 3px solid #9b59b6 !important;
+    background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+    box-shadow: 0 0 20px rgba(155, 89, 182, 0.6);
+    animation: accomplicePulse 1.5s infinite;
+}
+
+@keyframes accomplicePulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.08); }
+}
+
+.accomplice-confirm-btn {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 15px 30px;
+    font-size: 1.2rem;
+    background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(155, 89, 182, 0.4);
+    z-index: 1000;
+    transition: all 0.3s ease;
+}
+
+.accomplice-confirm-btn:hover:not(:disabled) {
+    transform: translateX(-50%) scale(1.05);
+    box-shadow: 0 6px 16px rgba(155, 89, 182, 0.6);
+}
+
+.accomplice-confirm-btn:disabled {
+    background: #95a5a6;
+    cursor: not-allowed;
+    box-shadow: none;
+}

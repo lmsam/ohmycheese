@@ -3,9 +3,10 @@ const gameState = {
     phase: 'setup', // setup, role-assignment, night, day, ended
     settings: {
         playerCount: 4,
-        language: 'zh-HK'
+        language: 'zh-HK',
+        discussionMinutes: 3
     },
-    players: [], // Array of { id, role, dice: [], diceRolled: false }
+    players: [], // Array of { id, name, role, dice: [], diceRolled: false, wakeUpChoice: null, isAccomplice: false }
     roleCheckIndex: 0,
     roleCheckState: 'waiting', // 'waiting', 'viewing', 'rolled'
     nightState: {
@@ -14,7 +15,9 @@ const gameState = {
         cheeseTaken: false,
         cheeseStealable: false,
         peekingEnabled: false,
-        currentStepIndex: 0
+        currentStepIndex: 0,
+        accompliceSelectionEnabled: false,
+        selectedAccomplices: [] // Array of player IDs
     },
     dayTimerInterval: null,
     audio: {
@@ -67,8 +70,8 @@ const translations = {
         nightStart: "天黑請閉眼",
         wakeUp: "{n}點！擲到{n}點嘅玩家請睜眼。",
         closeEyes: "請閉眼。",
-        thiefAccomplice5P: "如果芝士大盜同其他人同一時間睜眼，大盜請指向一位玩家作為你嘅共犯。",
-        thiefAccomplice: "芝士大盜請睜眼，並選擇{n}位共犯。",
+        thiefAccomplice5P: "如果芝士大盜同其他人同一時間睜眼，大盜請指向一位玩家作為你嘅共犯，然後拍一下佢。",
+        thiefAccomplice: "芝士大盜請睜眼，點選{n}位共犯，然後拍一下佢哋。",
         accompliceWake: "被選中嘅共犯請睜眼，同大盜相認。",
         thiefClose: "芝士大盜同共犯請閉眼。",
         morning: "天光啦！所有人請睜眼。",
@@ -122,13 +125,19 @@ const translations = {
         // Setup
         playerNameLabel: "玩家 {n} 名",
         playerNamePlaceholder: "玩家 {n}",
+        discussionTimerLabel: "討論時限",
+        discussionTimerMinutes: "{n} 分鐘",
+        // Accomplice Selection
+        selectAccomplices: "請點選 {n} 位玩家作為共犯",
+        accompliceSelected: "已選共犯",
+        accompliceConfirm: "確認共犯",
     },
     'en-US': {
         nightStart: "Everyone close your eyes",
         wakeUp: "{n} o'clock! Players with {n}, wake up.",
         closeEyes: "Everyone close your eyes.",
-        thiefAccomplice5P: "If the Thief woke up with anyone, Thief now points to ONE player to be your Accomplice.",
-        thiefAccomplice: "Thief wake up and choose an accomplice. Touch {n} player(s).",
+        thiefAccomplice5P: "If the Thief woke up with anyone, Thief now points to ONE player to be your Accomplice, then tap them.",
+        thiefAccomplice: "Thief wake up, tap {n} player(s) on screen, then physically tap them.",
         accompliceWake: "Selected accomplice(s) wake up and acknowledge the Thief.",
         thiefClose: "Thief and Accomplice(s) close your eyes.",
         morning: "Morning has broken! Everyone wake up.",
@@ -182,6 +191,12 @@ const translations = {
         // Setup
         playerNameLabel: "Player {n} Name",
         playerNamePlaceholder: "Player {n}",
+        discussionTimerLabel: "Discussion Timer",
+        discussionTimerMinutes: "{n} min",
+        // Accomplice Selection
+        selectAccomplices: "Tap {n} player(s) as accomplice(s)",
+        accompliceSelected: "Accomplice Selected",
+        accompliceConfirm: "Confirm Accomplices",
     }
 };
 
@@ -315,7 +330,8 @@ function assignRoles(playerCount) {
             role: roles[i],
             dice: [],
             diceRolled: false,
-            wakeUpChoice: null  // number, array, or null
+            wakeUpChoice: null,  // number, array, or null
+            isAccomplice: false
         });
     }
 }
@@ -445,7 +461,7 @@ function renderGameBoard() {
 
         const label = document.createElement('span');
         label.className = 'player-label';
-        label.textContent = `P${player.id}`;
+        label.textContent = player.name;
 
         const diceVal = document.createElement('span');
         diceVal.className = 'dice-value';
@@ -461,8 +477,27 @@ function renderGameBoard() {
         token.appendChild(label);
         token.appendChild(diceVal);
 
-        // Peek handler — only works when peeking is enabled
+        // Token click handler — handles both peeking and accomplice selection
         token.onclick = () => {
+            // Accomplice selection
+            if (gameState.nightState.accompliceSelectionEnabled) {
+                const maxAccomplices = gameState.settings.playerCount >= 7 ? 2 : 1;
+                const selectedIndex = gameState.nightState.selectedAccomplices.indexOf(player.id);
+                
+                if (selectedIndex > -1) {
+                    // Deselect
+                    gameState.nightState.selectedAccomplices.splice(selectedIndex, 1);
+                    token.classList.remove('accomplice-selected');
+                } else if (gameState.nightState.selectedAccomplices.length < maxAccomplices) {
+                    // Select
+                    gameState.nightState.selectedAccomplices.push(player.id);
+                    token.classList.add('accomplice-selected');
+                }
+                updateAccompliceConfirmButton();
+                return;
+            }
+
+            // Peeking
             console.log('[Peek] Token clicked:', player.id, 'peekingEnabled:', gameState.nightState.peekingEnabled);
             if (gameState.nightState.peekingEnabled && !token.classList.contains('revealed')) {
                 token.classList.add('revealed');
@@ -509,6 +544,75 @@ function updatePeekHint() {
 }
 
 /**
+ * Update accomplice selection UI hint and confirm button.
+ */
+function updateAccompliceHint() {
+    const hintEl = document.getElementById('peek-hint');
+    if (!hintEl) return;
+
+    if (gameState.nightState.accompliceSelectionEnabled) {
+        const maxAccomplices = gameState.settings.playerCount >= 7 ? 2 : 1;
+        const numText = maxAccomplices === 2 
+            ? (gameState.settings.language === 'zh-HK' ? '兩' : '2')
+            : (gameState.settings.language === 'zh-HK' ? '一' : '1');
+        hintEl.textContent = t('selectAccomplices', { n: numText });
+        hintEl.classList.remove('hidden');
+    } else {
+        hintEl.textContent = '';
+        hintEl.classList.add('hidden');
+    }
+}
+
+/**
+ * Update the accomplice confirm button visibility and state.
+ */
+function updateAccompliceConfirmButton() {
+    let confirmBtn = document.getElementById('accomplice-confirm-btn');
+    if (!confirmBtn && gameState.nightState.accompliceSelectionEnabled) {
+        // Create button if it doesn't exist
+        confirmBtn = document.createElement('button');
+        confirmBtn.id = 'accomplice-confirm-btn';
+        confirmBtn.className = 'accomplice-confirm-btn';
+        confirmBtn.textContent = t('accompliceConfirm');
+        confirmBtn.onclick = confirmAccompliceSelection;
+        document.querySelector('.night-screen').appendChild(confirmBtn);
+    }
+
+    if (confirmBtn) {
+        const maxAccomplices = gameState.settings.playerCount >= 7 ? 2 : 1;
+        const isValid = gameState.nightState.selectedAccomplices.length === maxAccomplices;
+        confirmBtn.disabled = !isValid;
+        confirmBtn.style.display = gameState.nightState.accompliceSelectionEnabled ? 'block' : 'none';
+    }
+}
+
+/**
+ * Confirm accomplice selection and mark players as accomplices.
+ */
+function confirmAccompliceSelection() {
+    // Mark selected players as accomplices
+    gameState.nightState.selectedAccomplices.forEach(playerId => {
+        const player = gameState.players.find(p => p.id === playerId);
+        if (player) {
+            player.isAccomplice = true;
+        }
+    });
+
+    // Disable selection mode
+    gameState.nightState.accompliceSelectionEnabled = false;
+    updateAccompliceHint();
+    updateAccompliceConfirmButton();
+
+    // Remove selection visual from tokens
+    const tokens = document.querySelectorAll('.player-token');
+    tokens.forEach(tok => tok.classList.remove('accomplice-selected'));
+
+    // Resume the sequence (this will be handled by the sequence runner)
+    // The sequence will automatically proceed to the next step
+}
+
+
+/**
  * Toggle .peekable class on all player tokens to show visual pulsing cue.
  */
 function updatePeekableTokens() {
@@ -543,6 +647,23 @@ async function runSequence(sequence) {
 
         // Update instruction UI
         if (instructionEl) instructionEl.textContent = step.text;
+
+        // Handle accomplice selection phase
+        if (step.type === 'accomplice' && step.text.includes(gameState.settings.language === 'zh-HK' ? '選擇' : 'choose')) {
+            gameState.nightState.accompliceSelectionEnabled = true;
+            gameState.nightState.selectedAccomplices = [];
+            updateAccompliceHint();
+            updateAccompliceConfirmButton();
+            
+            // Speak first
+            await speakText(step.text);
+            
+            // Wait for user to confirm accomplice selection
+            await waitForAccompliceConfirmation();
+            
+            // Selection is now confirmed, continue to next step
+            continue;
+        }
 
         // Handle peeking and cheese-steal state for wakeUp / closeEyes steps
         if (step.type === 'wakeUp' && step.hour) {
@@ -589,11 +710,35 @@ async function runSequence(sequence) {
     startDayPhase();
 }
 
+/**
+ * Wait for the user to confirm accomplice selection.
+ */
+function waitForAccompliceConfirmation() {
+    return new Promise((resolve) => {
+        // Store the original onclick
+        const confirmBtn = document.getElementById('accomplice-confirm-btn');
+        if (!confirmBtn) {
+            // Fallback: if no button, just resolve after a timeout
+            setTimeout(resolve, 1000);
+            return;
+        }
+
+        const originalOnclick = confirmBtn.onclick;
+        confirmBtn.onclick = () => {
+            if (originalOnclick) originalOnclick();
+            resolve();
+        };
+    });
+}
+
+
 function startDayPhase() {
     updateGameState({ phase: 'day' });
     playBGM('day');
     
     // Start discussion timer
+    const discussionMinutes = gameState.settings.discussionMinutes || 3;
+    const maxSeconds = discussionMinutes * 60;
     let seconds = 0;
     const timerEl = document.getElementById('discussion-timer');
     
@@ -604,7 +749,13 @@ function startDayPhase() {
         seconds++;
         const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
         const secs = (seconds % 60).toString().padStart(2, '0');
-        if (timerEl) timerEl.textContent = `${mins}:${secs}`;
+        if (timerEl) {
+            timerEl.textContent = `${mins}:${secs}`;
+            // Optional: add warning when time is running out
+            if (seconds >= maxSeconds) {
+                timerEl.style.color = '#e74c3c';
+            }
+        }
     }, 1000);
 }
 
@@ -719,7 +870,10 @@ function renderRoleReveal() {
 
         const roleEl = document.createElement('div');
         roleEl.className = 'reveal-role';
-        roleEl.textContent = `${getRoleIcon(player.role)} ${getRoleName(player.role)}`;
+        const accompliceBadge = player.isAccomplice 
+            ? (gameState.settings.language === 'zh-HK' ? ' (共犯)' : ' (Accomplice)')
+            : '';
+        roleEl.textContent = `${getRoleIcon(player.role)} ${getRoleName(player.role)}${accompliceBadge}`;
 
         const diceEl = document.createElement('div');
         diceEl.className = 'reveal-dice';
@@ -964,8 +1118,10 @@ function initGame() {
         startBtn.addEventListener('click', () => {
             const count = parseInt(playerCountSelect.value);
             const lang = languageSelect.value;
+            const discussionMinutes = parseInt(document.getElementById('discussion-timer').value);
             gameState.settings.playerCount = count;
             gameState.settings.language = lang;
+            gameState.settings.discussionMinutes = discussionMinutes;
             startRoleAssignment();
         });
     }
