@@ -197,8 +197,8 @@ function getNightSequence(playerCount) {
     ];
 
     for (let h = 1; h <= 6; h++) {
-        sequence.push({ text: t('wakeUp', { n: h }), duration: 8, hour: h, type: 'wakeUp' });
-        sequence.push({ text: t('closeEyes'), duration: 2, hour: h, type: 'closeEyes' });
+        sequence.push({ text: t('wakeUp', { n: h }), duration: 5, hour: h, type: 'wakeUp' });
+        sequence.push({ text: t('closeEyes'), duration: 1, hour: h, type: 'closeEyes' });
     }
 
     // 5 players: audio reminder for accomplice (physical/honor-based)
@@ -387,18 +387,27 @@ function renderGameBoard() {
 
         const diceVal = document.createElement('span');
         diceVal.className = 'dice-value';
-        diceVal.textContent = player.dice.join(',');
+        // Show wakeUpChoice for peeking (the relevant number)
+        if (Array.isArray(player.wakeUpChoice)) {
+            diceVal.textContent = player.wakeUpChoice.join(',');
+        } else if (player.wakeUpChoice !== null && player.wakeUpChoice !== undefined) {
+            diceVal.textContent = player.wakeUpChoice;
+        } else {
+            diceVal.textContent = player.dice.join(',');
+        }
 
         token.appendChild(label);
         token.appendChild(diceVal);
 
         // Peek handler — only works when peeking is enabled
         token.onclick = () => {
+            console.log('[Peek] Token clicked:', player.id, 'peekingEnabled:', gameState.nightState.peekingEnabled);
             if (gameState.nightState.peekingEnabled && !token.classList.contains('revealed')) {
                 token.classList.add('revealed');
                 // Disable further peeks (only one peek allowed per wake-up)
                 gameState.nightState.peekingEnabled = false;
                 updatePeekHint();
+                updatePeekableTokens();
                 setTimeout(() => {
                     token.classList.remove('revealed');
                 }, 2000);
@@ -438,6 +447,20 @@ function updatePeekHint() {
 }
 
 /**
+ * Toggle .peekable class on all player tokens to show visual pulsing cue.
+ */
+function updatePeekableTokens() {
+    const tokens = document.querySelectorAll('.player-token');
+    tokens.forEach(tok => {
+        if (gameState.nightState.peekingEnabled) {
+            tok.classList.add('peekable');
+        } else {
+            tok.classList.remove('peekable');
+        }
+    });
+}
+
+/**
  * Update cheese token visual state — glows when stealable.
  */
 function updateCheeseToken() {
@@ -468,15 +491,19 @@ async function runSequence(sequence) {
         // Handle peeking and cheese-steal state for wakeUp / closeEyes steps
         if (step.type === 'wakeUp' && step.hour) {
             gameState.nightState.currentHour = step.hour;
+            const awake = getAwakePlayersAtHour(step.hour);
             const peekAllowed = canPeekAtHour(step.hour);
+            console.log(`[Night] Hour ${step.hour}: awake=`, awake.map(p => `P${p.id}(${p.role})`), `peek=${peekAllowed}`);
             gameState.nightState.peekingEnabled = peekAllowed;
             gameState.nightState.cheeseStealable = canStealAtHour(step.hour);
             updatePeekHint();
+            updatePeekableTokens();
             updateCheeseToken();
         } else if (step.type === 'closeEyes' || step.type === 'intro' || step.type === 'morning') {
             gameState.nightState.peekingEnabled = false;
             gameState.nightState.cheeseStealable = false;
             updatePeekHint();
+            updatePeekableTokens();
             updateCheeseToken();
         }
 
@@ -497,6 +524,7 @@ async function runSequence(sequence) {
             gameState.nightState.peekingEnabled = false;
             gameState.nightState.cheeseStealable = false;
             updatePeekHint();
+            updatePeekableTokens();
             updateCheeseToken();
         }
     }

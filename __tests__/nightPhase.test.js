@@ -436,8 +436,11 @@ describe('Cheese Stealing Logic', () => {
         gameState.players[1].dice = [1];
         gameState.players[1].role = 'sleepyhead';
         gameState.players[2].dice = [2];
+        gameState.players[2].role = 'sleepyhead';
         gameState.players[3].dice = [4];
+        gameState.players[3].role = 'sleepyhead';
         gameState.players[4].dice = [5];
+        gameState.players[4].role = 'sleepyhead';
 
         expect(canStealAtHour(1)).toBe(false);
         expect(canStealAtHour(2)).toBe(false);

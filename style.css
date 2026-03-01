@@ -235,6 +235,17 @@ select {
     z-index: 20;
 }
 
+/* Pulsing green border when peeking is available */
+.player-token.peekable {
+    animation: peekPulse 0.8s ease-in-out infinite;
+    cursor: pointer;
+}
+
+@keyframes peekPulse {
+    0%, 100% { box-shadow: 0 0 4px rgba(76, 175, 80, 0.3); border-color: #333; }
+    50% { box-shadow: 0 0 14px rgba(76, 175, 80, 0.9); border-color: #4caf50; }
+}
+
 .player-token .dice-value {
     display: none;
     font-size: 1.2rem;
