@@ -44,6 +44,16 @@
                             <option value="10">10 min</option>
                         </select>
                     </div>
+                    <div class="control-group">
+                        <label for="night-wait-time-select">Sleep Duration / 睡覺時間</label>
+                        <select id="night-wait-time-select">
+                            <option value="3">3s (Fast)</option>
+                            <option value="5" selected>5s (Standard)</option>
+                            <option value="8">8s (Slow)</option>
+                            <option value="10">10s (Very Slow)</option>
+                            <option value="15">15s (Extra Slow)</option>
+                        </select>
+                    </div>
                     <div id="player-names-container" class="control-group">
                         <!-- Player name inputs will be generated here -->
                     </div>
@@ -90,6 +100,7 @@
                     <p id="instruction-text">Waiting to start...</p>
                     <p id="peek-hint" class="peek-hint hidden"></p>
                     <div id="timer-display"></div>
+                    <button id="night-done-btn" class="btn secondary-btn hidden">Done / 完成</button>
                 </div>
             </div>
 

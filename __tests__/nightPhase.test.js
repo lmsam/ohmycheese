@@ -73,6 +73,19 @@ describe('Night Phase Sequence', () => {
         });
     });
 
+    test('should use nightWaitTime setting for wakeUp and accomplice steps', () => {
+        gameState.settings.nightWaitTime = 10;
+        const sequence = getNightSequence(6);
+        
+        // Wake up steps should be 10s
+        const wakeUpSteps = sequence.filter(s => s.type === 'wakeUp');
+        expect(wakeUpSteps[0].duration).toBe(10);
+        
+        // Accomplice wake up step should be 10s
+        const accompliceWakeStep = sequence.find(s => s.text === "Selected accomplice(s) wake up and acknowledge the Thief.");
+        expect(accompliceWakeStep.duration).toBe(10);
+    });
+
     test('sequence ends with morning step', () => {
         for (let count = 4; count <= 8; count++) {
             const sequence = getNightSequence(count);

@@ -4,7 +4,8 @@ const gameState = {
     settings: {
         playerCount: 4,
         language: 'zh-HK',
-        discussionMinutes: 3
+        discussionMinutes: 3,
+        nightWaitTime: 5
     },
     players: [], // Array of { id, name, role, dice: [], diceRolled: false, wakeUpChoice: null, isAccomplice: false }
     roleCheckIndex: 0,
@@ -17,7 +18,10 @@ const gameState = {
         peekingEnabled: false,
         currentStepIndex: 0,
         accompliceSelectionEnabled: false,
-        selectedAccomplices: [] // Array of player IDs
+        selectedAccomplices: [], // Array of player IDs
+        actionInProgress: false, // Whether a peek animation is currently playing
+        actionTakenInHour: false, // Whether an action (peek/steal) was taken this hour
+        nightDone: false // Manual override to finish current night hour
     },
     dayTimerInterval: null,
     audio: {
@@ -129,6 +133,8 @@ const translations = {
         playerNamePlaceholder: "玩家 {n}",
         discussionTimerLabel: "討論時限",
         discussionTimerMinutes: "{n} 分鐘",
+        nightWaitTimeLabel: "睡覺時間",
+        nightWaitTimeSeconds: "{n} 秒",
         // Accomplice Selection
         selectAccomplices: "請點選 {n} 位玩家作為共犯",
         accompliceSelected: "已選共犯",
@@ -197,6 +203,8 @@ const translations = {
         playerNamePlaceholder: "Player {n}",
         discussionTimerLabel: "Discussion Timer",
         discussionTimerMinutes: "{n} min",
+        nightWaitTimeLabel: "Sleep Duration",
+        nightWaitTimeSeconds: "{n}s",
         // Accomplice Selection
         selectAccomplices: "Tap {n} player(s) as accomplice(s)",
         accompliceSelected: "Accomplice Selected",
@@ -275,15 +283,17 @@ function getNightSequence(playerCount) {
         { text: t('nightStart'), duration: 3, type: 'intro' }
     ];
 
+    const waitTime = gameState.settings.nightWaitTime || 5;
+
     for (let h = 1; h <= 6; h++) {
-        sequence.push({ text: t('wakeUp', { n: h }), duration: 5, hour: h, type: 'wakeUp' });
+        sequence.push({ text: t('wakeUp', { n: h }), duration: waitTime, hour: h, type: 'wakeUp' });
         sequence.push({ text: t('closeEyes'), duration: 1, hour: h, type: 'closeEyes' });
     }
 
     // 5 players: audio reminder for accomplice (physical/honor-based)
     if (playerCount === 5) {
         sequence.push({ text: t('thiefAccomplice5P'), duration: 8, type: 'accomplice' });
-        sequence.push({ text: t('accompliceWake'), duration: 5, type: 'accomplice' });
+        sequence.push({ text: t('accompliceWake'), duration: waitTime, type: 'accomplice' });
         sequence.push({ text: t('thiefClose'), duration: 3, type: 'accomplice' });
     }
 
@@ -293,7 +303,7 @@ function getNightSequence(playerCount) {
             ? (gameState.settings.language === 'zh-HK' ? "兩" : "TWO")
             : (gameState.settings.language === 'zh-HK' ? "一" : "ONE");
         sequence.push({ text: t('thiefAccomplice', { n: accompliceCount }), duration: 10, type: 'accomplice' });
-        sequence.push({ text: t('accompliceWake'), duration: 5, type: 'accomplice' });
+        sequence.push({ text: t('accompliceWake'), duration: waitTime, type: 'accomplice' });
         sequence.push({ text: t('thiefClose'), duration: 3, type: 'accomplice' });
     }
 
@@ -441,6 +451,7 @@ function renderGameBoard() {
     cheese.onclick = () => {
         if (!gameState.nightState.cheeseTaken && gameState.nightState.cheeseStealable) {
             gameState.nightState.cheeseTaken = true;
+            gameState.nightState.actionTakenInHour = true;
             cheese.classList.add('taken');
         }
     };
@@ -511,10 +522,13 @@ function renderGameBoard() {
                 token.classList.add('revealed');
                 // Disable further peeks (only one peek allowed per wake-up)
                 gameState.nightState.peekingEnabled = false;
+                gameState.nightState.actionTakenInHour = true;
+                gameState.nightState.actionInProgress = true;
                 updatePeekHint();
                 updatePeekableTokens();
                 setTimeout(() => {
                     token.classList.remove('revealed');
+                    gameState.nightState.actionInProgress = false;
                 }, 2000);
             }
         };
@@ -695,8 +709,18 @@ async function runSequence(sequence) {
         }
 
         // Handle peeking and cheese-steal state for wakeUp / closeEyes steps
+        const doneBtn = document.getElementById('night-done-btn');
         if (step.type === 'wakeUp' && step.hour) {
             gameState.nightState.currentHour = step.hour;
+            gameState.nightState.actionTakenInHour = false; // Reset for new hour
+            gameState.nightState.nightDone = false; // Reset manual override
+            if (doneBtn) {
+                doneBtn.classList.remove('hidden');
+                doneBtn.onclick = () => {
+                    console.log(`[Night] Hour ${step.hour} marked as done manually.`);
+                    gameState.nightState.nightDone = true;
+                };
+            }
             const awake = getAwakePlayersAtHour(step.hour);
             const peekAllowed = canPeekAtHour(step.hour);
             console.log(`[Night] Hour ${step.hour}: awake=`, awake.map(p => `P${p.id}(${p.role})`), `peek=${peekAllowed}`);
@@ -706,6 +730,7 @@ async function runSequence(sequence) {
             updatePeekableTokens();
             updateCheeseToken();
         } else if (step.type === 'closeEyes' || step.type === 'intro' || step.type === 'morning' || step.type === 'accomplice') {
+            if (doneBtn) doneBtn.classList.add('hidden');
             gameState.nightState.peekingEnabled = false;
             gameState.nightState.cheeseStealable = false;
             updatePeekHint();
@@ -720,9 +745,35 @@ async function runSequence(sequence) {
         if (step.duration > 0) {
             for (let s = step.duration; s > 0; s--) {
                 if (timerEl) timerEl.textContent = s;
+                // Early exit if user clicks "Done" before timer finishes
+                if (gameState.nightState.nightDone) break;
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
+            
+            // INDEFINITE WAIT: If we are in a wakeUp step, wait until either:
+            // 1. An action was taken (steal/peek) AND its animation finished
+            // 2. OR the user clicks the "Done" button
+            if (step.type === 'wakeUp') {
+                while (!gameState.nightState.nightDone && !gameState.nightState.actionTakenInHour) {
+                    if (timerEl) timerEl.textContent = 'WAIT';
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+
+                // If they took an action, wait for any in-progress peek animation to finish
+                while (gameState.nightState.actionInProgress) {
+                    if (timerEl) timerEl.textContent = 'REVEALING';
+                    console.log('[Night] Waiting for peek animation to finish...');
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+                
+                // Final safety buffer
+                if (gameState.nightState.actionTakenInHour || gameState.nightState.nightDone) {
+                    await new Promise(resolve => setTimeout(resolve, 800));
+                }
+            }
+
             if (timerEl) timerEl.textContent = '';
+            if (doneBtn) doneBtn.classList.add('hidden');
         }
 
         // Disable peeking and cheese-steal at end of wakeUp step's timer
@@ -1182,10 +1233,12 @@ function initGame() {
         startBtn.addEventListener('click', () => {
             const count = parseInt(playerCountSelect.value);
             const lang = languageSelect.value;
-            const discussionMinutes = parseInt(document.getElementById('discussion-timer').value);
+            const discussionMinutes = parseInt(document.getElementById('discussion-timer-select').value);
+            const nightWaitTime = parseInt(document.getElementById('night-wait-time-select').value);
             gameState.settings.playerCount = count;
             gameState.settings.language = lang;
             gameState.settings.discussionMinutes = discussionMinutes;
+            gameState.settings.nightWaitTime = nightWaitTime;
             startRoleAssignment();
         });
     }
